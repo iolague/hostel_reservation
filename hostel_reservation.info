@@ -1,0 +1,8 @@
+; $Id: hostel_reservation.info,v 1.0 2011/06/06 Drizzt Exp $
+package = Hostel Reservation
+name = Hostel Reservation
+description =  Hostel resevation with drupal.
+version = "1.0"
+core = 6.x
+
+
