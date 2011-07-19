@@ -1,0 +1,26 @@
+form#hostel-reservation-form div fieldset.collapsible {
+	height: 100px;
+}
+form#hostel-reservation-form div fieldset.collapsible div.fieldset-wrapper div#edit-name-wrapper.form-item {
+	width: 325px;
+}
+form#hostel-reservation-form div fieldset.collapsible div.fieldset-wrapper div#edit-name-wrapper.form-item input#edit-name.form-text {
+	width: 315px;
+}
+form#hostel-reservation-form div fieldset.collapsible div.fieldset-wrapper div#edit-product-wrapper.form-item {
+	left: 400px;
+    position: relative;
+    top: -36px;
+    width: 120px;
+}
+form#hostel-reservation-form div fieldset.collapsible div.fieldset-wrapper div#hostel-price {
+	left: 595px;
+    position: relative;
+    top: -90px;
+    width: 125px;
+}
+form#hostel-reservation-form div fieldset.collapsible div.fieldset-wrapper input#edit-submit.form-submit {
+	left: 867px;
+    position: relative;
+    top: -125px;
+}
