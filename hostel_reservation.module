@@ -1,0 +1,475 @@
+<?php
+
+function hostel_reservation_perm(){
+    return array('admin settings');
+}
+/**
+* Implementation of hook_menu()
+*/
+function hostel_reservation_menu() {
+	$items = array();
+	$items['admin/settings/hostel_reservation'] = array(
+			'title' => t('Hostel reservation settings'),
+			'description' => t('configura tu hostal'),
+			'page callback' => 'hostel_reservation_page',
+			'access arguments' => array('admin settings'),
+			'type' => MENU_NORMAL_ITEM,
+	);
+	$items['admin/settings/hostel_reservation/add/bed/%'] = array(
+			'title' => t('Adding beds'),
+			'description' => t('Editar habitacion'),
+			'page callback' => 'hostel_reservation_add_bed_page',
+			'access arguments' => array('admin settings'),
+			'type' => MENU_CALLBACK,
+	);
+	$items['admin/settings/hotel_reservation/delete/room/%'] = array(
+			'title' => t('Remove rooms'),
+			'description' => t('Delete room'),
+			'page callback' => 'hostel_reservation_delete_room_page',
+			'access arguments' => array('admin settings'),
+			'type' => MENU_CALLBACK,
+	);
+	$items['reservation'] = array(
+			'title' => t('Hostel reservation'),
+			'description' => t('Make your reservation'),
+			'page callback' => 'hostel_reservation_reservation_page',
+			'access arguments' => array('admin settings'),
+			'type' => MENU_CALLBACK,
+	);
+	$items['reservation/confirm'] = array(
+			'title' => t('Hostel reservation confirm'),
+			'description' => t('Make your reservation'),
+			'page callback' => 'hostel_reservation_reservation_confirm_page',
+			'access arguments' => array('admin settings'),
+			'type' => MENU_CALLBACK,
+	);
+	return $items;
+}
+
+            /*///// ADMIN CONTROLS //////*/
+            
+function hostel_reservation_page() {
+  if (user_access('admin settings')) {
+    $output = drupal_get_form('hostel_reservation_form');
+    return $output;
+  }
+}
+
+function hostel_reservation_form($form_state) {
+	drupal_add_css(drupal_get_path('module', 'hostel_reservation') . '/css/hostel_reservation.css');
+
+	//$form['#attributes'] = array('enctype' => "multipart/form-data");
+	$form['rooms'] = array (
+			'#value' => hostel_reservation_rooms_table(true),
+	);
+	$form['add_room'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Add room'),
+		'#weight' => 5,
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	$form['add_room']['name'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Name'),
+			'#default_value' => '',
+			'#size' => 60,
+			'#maxlength' => 50,
+			'#required' => TRUE,
+	);
+	
+	$form['add_room']['product'] = array(
+			'#type' => 'checkbox',
+			'#title' => t('Product.'),
+	);
+	$form['add_room']['price'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Price'),
+			'#default_value' => '',
+			'#size' => 10,
+			'#maxlength' => 10,
+			'#required' => FALSE,
+			'#prefix' => "<div id='hostel-price'>",
+			'#suffix' => "</div>",
+	);
+	/*$form['add_room']['image_path'] = array(
+			'#type' => 'file',
+			'#title' => t('Add new room icon'),
+			'#size' => 40,
+	);*/
+	
+	$form['add_room']['submit'] = array('#type' => 'submit', '#value' => t('Add room'));
+	return $form;
+}
+
+function hostel_reservation_form_submit($form, $form_state) { 
+	//dpm ($form_state);
+	/*
+	// validacion (imagen)
+	$validators['file_validate_is_image'] = array();
+
+	// subir fichero
+	$file = file_save_upload('image_path', $validators, variable_get(file_directory_path, 29));
+
+	if($file){*/
+	if ($form_state['values']['product'] != 0) {
+		db_query("INSERT INTO {hr_rooms} (name, room_price, product) VALUES ('" . $form_state['values']['name'] . "', " . $form_state['values']['price'] . ", " . $form_state['values']['product'] . ")" );
+		drupal_set_message(t('Your room has been saved.'));
+	} else {
+		db_query("INSERT INTO {hr_rooms} (name, room_price, product) VALUES ('" . $form_state['values']['name'] . "', 0, " . $form_state['values']['product'] . ")" );
+		drupal_set_message(t('Your room has been saved.'));
+		}
+	/*} else {
+		echo "not ok";
+	}*/	
+}
+
+function hostel_reservation_rooms_table($roombed) {
+	if($roombed){
+		$headers = array ( 
+			array ( 'data' => t('Room name'),),
+			array ( 'data' => t('Price'),),
+			array ( 'data' => t('Product'),),
+			array ( 'data' => t('Add'),),
+			array ( 'data' => t('Beds'),),
+			array ( 'data' => t('Remove'),),
+			);
+		} else {
+			$headers = array (
+				array ( 'data' => t('Bed type'),),
+				array ( 'data' => t('Price'),),
+				array ( 'data' => t('Remove'),),
+				);
+		}
+	if($roombed){
+		$sql = "SELECT id_room, name, room_price, product
+				FROM hr_rooms";
+	//$sql .= tablesort_sql($headers);	
+	} else {
+		$path = $_SERVER['REQUEST_URI'];
+		$room = split("/", $path);
+		//print ($room[count($room)-1]);
+		$sql = "SELECT id_bed, type, bed_price
+				FROM hr_beds
+				WHERE id_room = " . $room[count($room) - 1]; // PASAR ID ROOM TODO
+		}
+	
+	$limit = 10;
+	// generar una consulta paginada
+	$result = pager_query ( $sql, $limit );
+	
+	// ejecutar la query
+	$result = db_query ( $sql );
+	if ( $result ) {
+		// Establecer el array de datos
+		$data = '';
+		$i = 1;
+		// Bucle básico para obtener los datos
+		while ( $tmp = db_fetch_array($result)) {
+			if($roombed){
+				$data[$i]['name'] = $tmp['name'];
+				$data[$i]['price'] = $tmp['room_price'] . "€";
+				switch ($tmp['product']) {
+						case 0:
+							$data[$i]['product'] = t('No');
+							break;
+						case 1:
+							$data[$i]['product'] = t('Yes');
+							break;
+					}
+				$data[$i]['Add'] = l(t('Add beds'), "admin/settings/hostel_reservation/add/bed/" . $tmp['id_room']);
+	
+				$beds = db_result(db_query("SELECT count(id_bed) FROM hr_beds WHERE id_room = " . $tmp['id_room']));
+				$data[$i]['Beds'] = $beds;
+				
+				$data[$i]['remove'] = l(t('Remove'), "admin/settings/hostel_reservation/delete/room/" . $tmp['id_room']);
+				} else {
+					switch ($tmp['type']) {
+						case 0:
+							$data[$i]['type'] = t('Single');
+							break;
+						case 1:
+							$data[$i]['type'] = t('Double');
+							break;
+						case 2:
+							$data[$i]['type'] = t('Bunk');
+							break;
+					}
+					$data[$i]['price'] = $tmp['bed_price'] . "€";
+					$data[$i]['remove'] = l(t('Remove'), "admin/settings/hostel_reservation/room/delete/" . $tmp['id_room']);
+					}
+			$i++;
+		}	
+	$output = theme ('table', $headers, $data);
+	$output .= theme ('pager', NULL, $limit, 0);
+	
+	return $output;
+  }
+}
+
+			/*////  REMOVE ROOM ////*/
+
+function hostel_reservation_delete_room_page() {
+  if (user_access('admin settings')) {
+    $output = drupal_get_form('hostel_reservation_delete_room_form');
+    return $output;
+  }
+}
+
+function hostel_reservation_delete_room_form($form_state) {
+
+
+}
+
+			/*/////  ADD BED  /////*/	
+	
+function hostel_reservation_add_bed_page() {
+  if (user_access('admin settings')) {
+    $output = drupal_get_form('hostel_reservation_add_bed_form');
+    return $output;
+  }
+}
+
+function hostel_reservation_add_bed_form($form_state) {			
+	$form['add_bed'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Add bed'),
+		'#weight' => 5,
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	$form['rooms'] = array (
+			'#value' => hostel_reservation_rooms_table(false),
+	);
+	
+	$bed_type = array(t('Single'), t('Double'), t('Bunk'));
+
+	$form['add_bed']['bed_types'] = array(
+			'#type' => 'select',
+			'#options' => $bed_type,
+			'#title' => t('Bed type'),
+			'#default_value' => 0,
+			'#required' => TRUE,
+	);
+	
+	$form['add_bed']['price'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Price'),
+			'#default_value' => '',
+			'#size' => 10,
+			'#maxlength' => 50,
+			'#required' => FALSE,
+			'#prefix' => "<div id='hostel-price'>",
+			'#suffix' => "</div>",
+	);
+	
+	$form['add_bed']['submit'] = array('#type' => 'submit', '#value' => t('Add bed'));
+	return $form;
+}
+
+function hostel_reservation_add_bed_form_submit($form, $form_state) {
+	//dpm($form_state);
+	$path = $_SERVER['REQUEST_URI'];
+	$room = split("/", $path);
+	$id_room = str_replace(base_path() . "?q=admin/settings/hostel_reservation/add/bed/", "", $path);
+	$id_room = str_replace(base_path() . "admin/settings/hostel_reservation/add/bed/", "", $path); 
+	db_query("INSERT INTO {hr_beds} (type, bed_price, id_room) VALUES (" . $form_state['values']['bed_types'] . ", " . $form_state['values']['price'] . ", " . $room[count($room) - 1] . ")" ); // PASAR ID ROOM TODO
+}
+
+			/*/////  BLOCK RESERVATION  /////*/
+
+//$block = module_invoke('Nuevos', 'block', 'view', 0);
+//print $block['content'];
+
+function hostel_reservation_block($op = 'list', $delta = 0, $edit = array()) {
+	switch ($op) {
+		case 'list':
+			$blocks[0] = array(
+            'info' => t('Hostel reservation block'),       
+			);
+		return $blocks;
+
+        case 'view':          
+			$block['subject'] = "Reservations";
+            $block['content'] = drupal_get_form("hostel_reservation_block_form");  
+			return $block;
+        }
+    }
+
+function hostel_reservation_block_form($form_state){
+	$format = 'd/m/Y';
+	/*if($_GET('date')) {
+		$datevalue= $_GET('date');
+		} else {*/
+			$datevalue= format_date(time(), 'custom', 'd/m/Y');
+		//}
+	
+    $form['arrival-day'] = array(
+		'#type' => 'date_popup', // types 'date_text' and 'date_timezone' are also supported. See .inc file.
+		'#title' => 'Fecha de finalizacion',
+		'#default_value' => $datevalue, // poner fecha de hoy TODO
+		'#date_format' => $format,
+		'#date_label_position' => 'within',
+		'#required' => TRUE,
+	);
+	$form['nights'] = array(
+		  '#type' => 'textfield',
+		  '#title' => t('Nights'),
+		  '#default_value' => 1,
+		  '#size' => 20,
+		  '#maxlength' => 3,
+		  '#required' => TRUE,
+	);
+
+	$form['submit'] = array(
+			'#type' => 'submit', 
+			'#value' => t('Search availability'),
+	);
+	return $form;
+}		
+			
+function hostel_reservation_block_form_submit($form, &$form_state) {
+	//dpm($form_state);
+	$query = 'date=' . str_replace(' 00:00:00' , '', $form_state['values']['arrival-day']) . '&nights=' . $form_state['values']['nights'];
+	//$form['#redirect'] = array('admin/settings/hotel_reservation/reservation/page', 'fecha='. $form['arrival-day']);
+	drupal_goto("reservation", $query);
+	//drupal_goto("admin/settings/hotel_reservation/reservation/page");
+	//$form['#redirect'] = 'reservation/page';
+}
+
+			/*/////  MAKE RESERVATION PAGE  /////*/
+
+function hostel_reservation_reservation_page(){
+	if (user_access('admin settings')) {
+		$output = drupal_get_form('hostel_reservation_reservation_page_form');
+		return $output;
+	}
+}
+
+function hostel_reservation_reservation_page_form($form_state) {
+	dpm($form_state);
+	$form['reservations'] = array (
+			'#value' => hostel_reservation_list($_GET['date'], $_GET['nights']),
+	);
+	
+	$form['submit'] = array(
+			'#type' => 'submit', 
+			'#value' => t('Confirm'),
+	);
+	return $form;
+}
+
+function hostel_reservation_reservation_page_form_submit($form, &$form_state) {
+	$form_state['storage']['results'] = hostel_reservation_list($_GET['date'], $_GET['nights']);
+	//$query = 'date=' . $_GET['date'] . '&nights=' . $_GET['nights'];
+	
+	//drupal_goto("reservation/confirm", $query);	
+}
+	
+function hostel_reservation_list($date, $nights){
+	$headers = array ( 
+			   array ( 'data' => t('Rooms'),),
+			   array ( 'data' => t('Beds avaible'),),
+			   array ( 'data' => t('Bed number'),),
+			   );
+	$output = "";
+	for ($j = 0; $j <= $nights-1; $j++) {
+		$sqlroom = "SELECT id_room, name
+					FROM hr_rooms";
+	
+		// ejecutar la query
+		$resultroom = db_query($sqlroom);
+		if ($resultroom) {
+			// Establecer el array de datos
+			$data = '';
+			$i = 1;
+			// Bucle básico para obtener los datos
+			while ( $tmproom = db_fetch_array($resultroom)) {
+				$data[$i]['name'] = $tmproom['name'];
+				$data[$i]['beds-avaible'] = db_result(db_query("SELECT count(id_bed) FROM hr_beds WHERE id_room = " . $tmproom['id_room'])) - db_result(db_query("SELECT count(id_bed) FROM hr_reservations WHERE id_room = " . $tmproom['id_room'] ." AND arrival_day = ". strtotime($date)));
+				$data[$i]['Beds'] = drupal_get_form('reservation_number_form', (strtotime($date) + ($j * 86400)), ($data[$i]['beds-avaible'] + 1), $tmproom['id_room']);
+
+				$i++;
+			}	
+			$output = theme ('table', $headers, $data);
+			//$output .= theme ('pager', NULL, $limit, 0);
+			$day = format_date((strtotime($date) + ($j * 86400)), custom, 'D, d M Y');
+			$table .= "<h4>" . $day . "</h4>" . $output;
+		}
+	}
+	return $table;
+}
+
+function reservation_number_form($form_state, $date, $nights, $id_room) {
+	//combobox tipo de material idreservation-12/12/2012-room12
+	for ($n = 0; $n <= $nights-1; $n++) {
+        $avaible[$n]= $n;
+	}
+
+        $form[$date . "/" . $id_room] = array(
+            '#type' => 'select',
+            //'#title' => t(''),
+			'#default_value' => 0,
+            '#options' => $avaible,
+           //'#description' => t(''),
+		);
+	return $form;
+}
+
+			/*//////  CONFIRM RESERVATION  /////*/
+			
+function hostel_reservation_reservation_confirm_page(){
+	if (user_access('admin settings')) {
+		$output = drupal_get_form('hostel_reservation_reservation_confirm_page_form');
+		return $output;
+	}
+}
+
+function hostel_reservation_reservation_confirm_page_form($form_state){
+	//dpm($form_state);
+	$form['submit'] = array(
+			'#type' => 'submit', 
+			'#value' => t('Confirm'),
+	);
+	return $form;
+}
+
+function hostel_reservation_reservation_confirm_page_form_submit(){
+	
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
+function simplereservation_item_delete_confirm($form, $iid) {
+  $abort_path = 'admin/settings/simplereservation';
+
+  // darf ein item geloescht werden, wenn es dafuer Reservierungen gibt? Im Moment JA.
+
+  $sql = "SELECT * FROM {simplereservation_item} WHERE iid=%d";
+  $result = db_query($sql, $iid);
+  $row = db_fetch_array($result);
+
+  $form = array();
+  $form['iid'] = array('#type' => 'hidden', '#value' => $iid);
+  return confirm_form($form,
+  t('Are you sure you want to delete the item %name?', array('%name' => $row['name'])),
+  $abort_path,
+  t('This action cannot be undone.'),
+  t('Delete'),
+  t('Cancel')
+  );
+}
+
+/**
+ * Handle the deletion of a item
+ 
+function simplereservation_item_delete_confirm_submit($form, &$form_state) {
+
+  $sql = "DELETE FROM {simplereservation_item} WHERE iid=%d";
+  db_query($sql, $form_state['values']['iid']);
+  drupal_set_message(t('The item has been deleted.'));
+
+  // go back to the administration
+  $form_state['redirect'] = 'admin/settings/simplereservation';
+}
+*/

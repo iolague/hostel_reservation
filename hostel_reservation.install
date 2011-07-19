@@ -1,0 +1,41 @@
+<?php
+// $Id$
+/**
+* Implementation of hook_install()
+*/
+function hostel_reservation_install() {
+// Utiliza el schema API para crear la tabla en la base de datos
+ drupal_install_schema('node_expiration_date');
+}
+/**
+* Implementation of hook_uninstall()
+*/
+function hostel_reservation_uninstall() {
+// Utiliza el schema API para eliminar la tabla en la base de datos.
+drupal_uninstall_schema('node_expiration_date');
+// Elimina las variables asociadas al módulo de la tabla variable
+variable_del('node_expiration_date_node_types');
+}
+/**
+* Implementation of hook_schema()
+*/
+function hostel_reservation_schema() {
+	$schema['node_expiration_date'] = array(
+		'description' => t('Table to store node expiration dates'),
+		'fields' => array(
+			'nid' => array(
+			'type' => 'int',
+			'unsigned' => TRUE,
+			'not null' => TRUE,
+			'description' => t('The node id {node}.nid with an expiration date'),
+			),
+			'expiration_date' => array(
+			'description' => t('Expiration date for the node: Unix timestamp'),
+			'type' => 'int',
+			'not null' => TRUE,
+			),
+	),
+	'primary key' => array('nid'),
+);
+return $schema;
+}
